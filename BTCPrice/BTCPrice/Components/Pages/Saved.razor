@@ -1,0 +1,153 @@
+﻿@page "/saved"
+
+@using BTCPrice.Model
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext DbContext
+
+@rendermode InteractiveServer
+
+@if (savedDataItems == null)
+{
+    <p>Loading saved data...</p>
+}
+else if (!savedDataItems.Any())
+{
+    <p>No data has been saved yet.</p>
+}
+else
+{
+    <h1>Saved Bitcoin Price</h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>EUR</th>
+                <th>CZK</th>
+                <th>Time</th>
+                <th>Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var detail in savedDataItems)
+            {
+                <tr>
+                    <td>
+                        @detail.Id
+                    </td>
+                    <td>
+                        @if (editingItemId == detail.Id)
+                        {
+                            <InputNumber @bind-Value="editItem.PriceEUR" class="form-control" Format="C2" />
+                        }
+                        else
+                        {
+                            @detail.PriceEUR
+                        }
+                    </td>
+                    <td>
+                        @if (editingItemId == detail.Id)
+                        {
+                            <InputNumber @bind-Value="editItem.PriceCZK" class="form-control" Format="C2" />
+                        }
+                        else
+                        {
+                            @detail.PriceCZK
+                        }
+                    </td>
+                    <td>
+                        @detail.Time
+                    </td>
+                    <td>
+                        @if (editingItemId == detail.Id)
+                        {
+                            <InputText @bind-Value="editItem.Note" class="form-control" />
+                        }
+                        else
+                        {
+                            @detail.Note
+                        }
+                    </td>
+                    <td>
+                        @if (editingItemId == detail.Id)
+                        {
+                            <button class="btn btn-sm btn-success" @onclick="SaveEditedItem">Save</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">Cancel</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick="() => StartEdit(detail)">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveItem(detail.Id)">Remove</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<PriceDetail> savedDataItems;
+
+    private long editingItemId = 0L;
+    private PriceDetail editItem = new PriceDetail();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSavedData();
+    }
+
+    private async Task LoadSavedData()
+    {
+        savedDataItems = await DbContext.Prices.ToListAsync();
+    }
+
+    private void StartEdit(PriceDetail item)
+    {
+        editingItemId = item.Id;
+        editItem = new PriceDetail 
+        { 
+            Id = item.Id, 
+            PriceEUR = item.PriceEUR, 
+            PriceCZK = item.PriceCZK,
+            Note = item.Note,
+        }; // Create a copy for editing
+        StateHasChanged();
+    }
+
+    private void CancelEdit()
+    {
+        editingItemId = 0;
+        editItem = new PriceDetail();
+
+        StateHasChanged();
+    }
+
+    private async Task SaveEditedItem()
+    {
+        var itemToUpdate = await DbContext.Prices.FindAsync(editItem.Id);
+        if (itemToUpdate != null)
+        {
+            itemToUpdate.PriceEUR = editItem.PriceEUR;
+            itemToUpdate.PriceCZK = editItem.PriceCZK;
+            itemToUpdate.Note = editItem.Note;
+
+            await DbContext.SaveChangesAsync();
+            editingItemId = 0;
+            editItem = new PriceDetail();
+            await LoadSavedData(); // Refresh the table
+        }
+    }
+
+    private async Task RemoveItem(long id)
+    {
+        var itemToRemove = await DbContext.Prices.FindAsync(id);
+        if (itemToRemove != null)
+        {
+            DbContext.Prices.Remove(itemToRemove);
+            await DbContext.SaveChangesAsync();
+            await LoadSavedData(); // Refresh the table
+        }
+    }
+}

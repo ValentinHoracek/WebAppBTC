@@ -11,10 +11,8 @@ namespace BTCPrice.Model
         [JsonPropertyName("PRICE")]
         public decimal Price { get; set; }
 
-
         [JsonPropertyName("PRICE_LAST_UPDATE_TS")]
         public long PriceLastUpdateTs { get; set; }
-
 
         public decimal? CzkEurRate { get; set; }
 

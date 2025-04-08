@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using BTCPrice.Model;
 
 public class AppDbContext : DbContext

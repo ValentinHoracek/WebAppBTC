@@ -1,34 +1,45 @@
 ﻿@page "/price"
+
 @using System.Threading
 @using BTCPrice.Services
 @using BTCPrice.Model
+@using System.Globalization
+
 @inject CNBService CNBService
 @inject CoindeskService CoindeskService
-@rendermode InteractiveServer
 @inject AppDbContext DbContext
 @inject NavigationManager NavigationManager
 
+@rendermode InteractiveServer
 
-<h1>Bitcoin Price</h1>
-<table class="table">
-    <thead>
-        <tr>
-            <th>EUR</th>
-            <th>CZK</th>
-            <th>Time</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach(var detail in model.PriceDetails)
-        {
+<EditForm Model="@model.PriceDetails" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <h1>Bitcoin Price</h1>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+
+</EditForm>
+    <table class="table">
+        <thead>
             <tr>
-                <td>@detail.PriceEUR</td>
-                <td>@detail.PriceCZK</td>
-                <td>@detail.Time</td>
+                <th>Price (EUR)</th>
+                <th>Price (CZK)</th>
+                <th>Time</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            @foreach(var detail in model.PriceDetails)
+            {
+                <tr>
+                    <td>@detail.PriceEUR</td>
+                    <td>@detail.PriceCZK</td>
+                    <td>@detail.Time</td>
+                </tr>
+            }
+        </tbody>
+    </table>
 
 @code {
 
@@ -39,6 +50,7 @@
     private DateTimeOffset lastUpdated;
     private decimal? exchangeRateCzkEur;
     private PriceModel model;
+    private bool isTimerEnabled = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -49,7 +61,14 @@
 
         await GetPrice();
 
-        timer = new Timer(async _ => await InvokeAsync(GetPrice), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+        timer = new Timer(async _ =>
+        {
+            if (isTimerEnabled)
+            {
+                await InvokeAsync(GetPrice);
+            }
+        }
+            , null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
     }
 
     private async Task GetPrice()
@@ -106,5 +125,22 @@
     public void Dispose()
     {
         timer?.Dispose();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isTimerEnabled = false;
+
+        DbContext.Prices.AddRangeAsync(model.PriceDetails);
+        // Save changes to the in-memory database
+        await DbContext.SaveChangesAsync(); 
+
+        // Optionally, clear the form and refresh the list
+        model.PriceDetails.Clear();
+
+        isTimerEnabled = true;
+
+        // Navigated to saved datapage
+        NavigationManager.NavigateTo("/saved");
     }
 }
