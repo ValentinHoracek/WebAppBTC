@@ -1,0 +1,110 @@
+﻿@page "/price"
+@using System.Threading
+@using BTCPrice.Services
+@using BTCPrice.Model
+@inject CNBService CNBService
+@inject CoindeskService CoindeskService
+@rendermode InteractiveServer
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+
+
+<h1>Bitcoin Price</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th>EUR</th>
+            <th>CZK</th>
+            <th>Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach(var detail in model.PriceDetails)
+        {
+            <tr>
+                <td>@detail.PriceEUR</td>
+                <td>@detail.PriceCZK</td>
+                <td>@detail.Time</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+
+    private CoindeskResponse response;
+    private Data bitcoinData;
+    private string error;
+    private Timer timer;
+    private DateTimeOffset lastUpdated;
+    private decimal? exchangeRateCzkEur;
+    private PriceModel model;
+
+    protected override async Task OnInitializedAsync()
+    {
+        model = new PriceModel();
+
+        exchangeRateCzkEur = await CNBService.GetCzkEurPrice();
+        StateHasChanged();
+
+        await GetPrice();
+
+        timer = new Timer(async _ => await InvokeAsync(GetPrice), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+    }
+
+    private async Task GetPrice()
+    {
+        try
+        {
+            response = await CoindeskService.GetBTCEURAsync();
+            if (response?.Data?.BtcEur != null)
+            {
+
+
+                await InvokeAsync(() =>
+                {
+                    bitcoinData = response.Data.BtcEur;
+                    bitcoinData.CzkEurRate = exchangeRateCzkEur;
+
+                    model.PriceDetails.Add(
+                        new PriceDetail
+                        {
+                            PriceEUR = bitcoinData?.Price,
+                            PriceCZK = bitcoinData?.PriceCZK,
+                            Time = DateTimeOffset.FromUnixTimeSeconds(bitcoinData.PriceLastUpdateTs),
+                        }
+                    );
+
+                    lastUpdated = DateTimeOffset.FromUnixTimeSeconds(bitcoinData.PriceLastUpdateTs);
+                    error = null;
+
+                    Console.WriteLine($"Price Updated: {bitcoinData.Price}, CZK Price: {bitcoinData.PriceCZK}, Timestamp: {lastUpdated}");
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                await InvokeAsync(() =>
+                {
+                    error = "Failed to retrieve Bitcoin price.";
+                    bitcoinData = null;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() =>
+            {
+                error = $"An unexpected error occurred: {ex.Message}";
+                bitcoinData = null;
+                StateHasChanged();
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}
