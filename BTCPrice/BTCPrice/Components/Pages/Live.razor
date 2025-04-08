@@ -1,4 +1,4 @@
-﻿@page "/price"
+﻿@page "/live"
 
 @using System.Threading
 @using BTCPrice.Services
@@ -68,7 +68,7 @@
                 await InvokeAsync(GetPrice);
             }
         }
-            , null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+            , null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
     }
 
     private async Task GetPrice()
